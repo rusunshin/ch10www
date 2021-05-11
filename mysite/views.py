@@ -6,6 +6,9 @@ from . import models, forms
 from django.core.mail import send_mail
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import redirect
+from django.contrib.sessions.models import Session
+from django.contrib import messages
+
 # Create your views here.
 # def index(request):
 #     years = range(1960,2021)
@@ -26,7 +29,7 @@ from django.shortcuts import redirect
 def index(request, pid=None, del_pass=None):
     if 'username' in request.session:
         username = request.session['username']
-        usercolor = request.session['usercolor']
+        useremail = request.session['usermail']
 
     return render(request, 'index.html', locals())
 
@@ -109,22 +112,42 @@ def login(request):
     if request.method == 'POST':
         login_form = forms.LoginForm(request.POST)
         if login_form.is_valid():
-            username = request.POST['user_name']
-            usercolor = request.POST['user_color']
-            message = "登入成功"
+            login_name = request.POST['username'].strip()
+            login_password = request.POST['password']
+            try:
+                user = models.User.objects.get(name=login_name)
+                if user.password == login_password:
+                    request.session['username'] = user.name
+                    request.session['useremail'] = user.email
+                    messages.add_message(request, messages.SUCCESS, '成功登入了')
+                    return redirect('/')
+                else:
+                    messages.add_message(request, messages.WARNING, "密碼錯誤，請再檢查一次")
+            except:
+                messages.add_message(request, messages.WARNING, "找不到使用者")
         else:
-            message = "請檢查輸入的欄位內容"
+            messages.add_message(request, messages.INFO, "請檢查輸入的欄位內容")
     else:
         login_form = forms.LoginForm()
-
-    try:
-        if username: request.session['username'] = username
-        if usercolor: request.session['usercolor'] = usercolor
-    except:
-        pass
 
     return render(request, 'login.html', locals())
 
 def logout(request):
-    request.session['username'] = None
+    if 'username' in request.session:
+        Session.objects.all().delete()
+        return redirect('/login/')
     return redirect('/')
+
+
+def userinfo(request):
+    if 'username' in request.session:
+        username = request.session['username']
+    else:
+        return redirect('/login/')
+
+    try:
+        userinfo = models.User.objects.get(name=username)
+    except:
+        pass
+
+    return render(request, 'userinfo.html', locals())
